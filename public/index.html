@@ -80,6 +80,60 @@
       font-size: 1em;
       vertical-align: middle;
     }
+    .login-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(244,246,251,0.98);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .login-box {
+      background: #fff;
+      border-radius: 10px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+      padding: 2em 2em 1.5em 2em;
+      min-width: 320px;
+      display: flex;
+      flex-direction: column;
+      align-items: stretch;
+      gap: 1em;
+    }
+    .login-box h3 {
+      margin: 0 0 0.5em 0;
+      font-weight: 600;
+      color: #222;
+      text-align: center;
+    }
+    .login-box input[type="password"] {
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      padding: 0.5em 0.75em;
+      font-size: 1em;
+      background: #f9fafb;
+      margin-bottom: 0.5em;
+    }
+    .login-box button {
+      background: #6366f1;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 0.6em 1.2em;
+      font-size: 1em;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+    .login-box button:hover, .login-box button:focus {
+      background: #4f46e5;
+    }
+    .login-error {
+      color: #ef4444;
+      font-size: 0.95em;
+      text-align: center;
+      min-height: 1.5em;
+    }
     @media (max-width: 600px) {
       .container {
         padding: 1em;
@@ -92,7 +146,15 @@
   </style>
 </head>
 <body>
-  <div class="container">
+  <div id="loginOverlay" class="login-overlay">
+    <form class="login-box" id="loginForm" onsubmit="return login(event)">
+      <h3>Login</h3>
+      <input type="password" id="loginPassword" placeholder="Enter password" autocomplete="current-password" required />
+      <div class="login-error" id="loginError"></div>
+      <button type="submit">Login</button>
+    </form>
+  </div>
+  <div class="container" id="mainContainer" style="display:none;">
     <h2>Edit .env File</h2>
     <label>
       Project name:
@@ -110,6 +172,24 @@
     </div>
   </div>
   <script>
+    // --- Login logic ---
+    async function login(event) {
+      event.preventDefault();
+      const pwd = document.getElementById('loginPassword').value;
+      const res = await fetch('/api/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: pwd })
+      });
+      if (res.ok) {
+        document.getElementById('loginOverlay').style.display = 'none';
+        document.getElementById('mainContainer').style.display = '';
+        fetchProjects();
+      } else {
+        document.getElementById('loginError').textContent = 'Incorrect password.';
+      }
+      return false;
+    }
     async function fetchProjects() {
       const res = await fetch('/api/env');
       const projects = await res.json();
@@ -154,8 +234,6 @@
       document.getElementById('msg').textContent = 'Copied!';
       setTimeout(() => document.getElementById('msg').textContent = '', 1000);
     }
-    // Replace auto-load default with:
-    fetchProjects();
   </script>
 </body>
 </html>

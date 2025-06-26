@@ -38,6 +38,16 @@ app.get('/api/env', (req, res) => {
   res.json(files);
 });
 
+// ---  login endpoint ---
+app.post('/api/login', (req, res) => {
+  const { password } = req.body;
+  if (password === 'admin') {
+    res.json({ success: true });
+  } else {
+    res.status(401).json({ success: false, error: 'Invalid password' });
+  }
+});
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`🌍 .env sync server running on port ${PORT}`);
