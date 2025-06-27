@@ -134,6 +134,32 @@
       text-align: center;
       min-height: 1.5em;
     }
+    /* Toast styles */
+    #toast {
+      visibility: hidden;
+      min-width: 200px;
+      background: #ef4444;
+      color: #fff;
+      text-align: center;
+      border-radius: 6px;
+      padding: 0.8em 1.2em;
+      position: fixed;
+      left: 50%;
+      bottom: 40px;
+      transform: translateX(-50%);
+      z-index: 2000;
+      font-size: 1em;
+      opacity: 0;
+      transition: opacity 0.3s, visibility 0.3s;
+      box-shadow: 0 2px 12px rgba(239,68,68,0.12);
+    }
+    #toast.show {
+      visibility: visible;
+      opacity: 1;
+    }
+    #toast.success {
+      background: #10b981;
+    }
     @media (max-width: 600px) {
       .container {
         padding: 1em;
@@ -147,12 +173,13 @@
 </head>
 <body>
   <div id="loginOverlay" class="login-overlay">
-    <form class="login-box" id="loginForm" onsubmit="return login(event)">
+    <div class="login-box" id="loginBox">
       <h3>Login</h3>
-      <input type="password" id="loginPassword" placeholder="Enter password" autocomplete="current-password" required />
+      <button id="googleLoginBtn" onclick="googleLogin()" type="button" style="display:flex;align-items:center;justify-content:center;gap:0.5em;">
+        <img src="https://www.citypng.com/public/uploads/preview/google-logo-icon-gsuite-hd-701751694791470gzbayltphh.png" alt="Google" style="width:20px;height:20px;"> Login with Google
+      </button>
       <div class="login-error" id="loginError"></div>
-      <button type="submit">Login</button>
-    </form>
+    </div>
   </div>
   <div class="container" id="mainContainer" style="display:none;">
     <h2>Edit .env File</h2>
@@ -168,27 +195,36 @@
     <div style="display: flex; align-items: center; gap: 0.5em;">
       <button onclick="saveEnv()">Save</button>
       <button onclick="copyEnv()">Copy to Clipboard</button>
+      <button onclick="logout()" style="margin-left:auto;background:#ef4444;">Logout</button>
       <span id="msg"></span>
     </div>
   </div>
+  <div id="toast"></div>
   <script>
-    // --- Login logic ---
-    async function login(event) {
-      event.preventDefault();
-      const pwd = document.getElementById('loginPassword').value;
-      const res = await fetch('/api/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: pwd })
-      });
-      if (res.ok) {
-        document.getElementById('loginOverlay').style.display = 'none';
-        document.getElementById('mainContainer').style.display = '';
-        fetchProjects();
-      } else {
-        document.getElementById('loginError').textContent = 'Incorrect password.';
+    // --- Google Login logic ---
+    async function checkAuth() {
+      try {
+        const res = await fetch('/api/user');
+        const data = await res.json();
+        if (data.authenticated) {
+          document.getElementById('loginOverlay').style.display = 'none';
+          document.getElementById('mainContainer').style.display = '';
+          fetchProjects();
+        } else {
+          document.getElementById('loginOverlay').style.display = '';
+          document.getElementById('mainContainer').style.display = 'none';
+        }
+      } catch (err) {
+        showToast('Failed to check authentication');
       }
-      return false;
+    }
+    function googleLogin() {
+      window.location.href = '/auth/google';
+    }
+    async function logout() {
+      await fetch('/api/logout');
+      document.getElementById('mainContainer').style.display = 'none';
+      document.getElementById('loginOverlay').style.display = '';
     }
     async function fetchProjects() {
       const res = await fetch('/api/env');
@@ -214,18 +250,35 @@
     async function loadEnv() {
       const project = document.getElementById('project').value;
       const res = await fetch(`/api/env/${project}`);
-      document.getElementById('envContent').value = res.ok ? await res.text() : '';
+      if (res.ok) {
+        document.getElementById('envContent').value = await res.text();
+      } else {
+        document.getElementById('envContent').value = '';
+        showToast('Failed to load .env file');
+      }
+    }
+    function showToast(msg, type = 'error') {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.className = 'show' + (type === 'success' ? ' success' : '');
+      setTimeout(() => {
+        toast.className = toast.className.replace('show', '');
+      }, 2000);
     }
     async function saveEnv() {
       const project = document.getElementById('project').value;
       const content = document.getElementById('envContent').value;
-      await fetch(`/api/env/${project}`, {
+      const res = await fetch(`/api/env/${project}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ content })
       });
-      document.getElementById('msg').textContent = 'Saved!';
-      setTimeout(() => document.getElementById('msg').textContent = '', 1000);
+      if (res.ok) {
+        document.getElementById('msg').textContent = 'Saved!';
+        setTimeout(() => document.getElementById('msg').textContent = '', 1000);
+      } else {
+        showToast('Failed to save .env file');
+      }
     }
     function copyEnv() {
       const textarea = document.getElementById('envContent');
@@ -234,6 +287,23 @@
       document.getElementById('msg').textContent = 'Copied!';
       setTimeout(() => document.getElementById('msg').textContent = '', 1000);
     }
+    // Add this function to handle login errors (e.g., after redirect from Google with error param)
+    function checkLoginError() {
+      const params = new URLSearchParams(window.location.search);
+      if (params.has('error')) {
+        const msg = params.get('error') === 'access_denied'
+          ? 'Google login was denied.'
+          : 'Login failed. Please try again.';
+        document.getElementById('loginError').textContent = msg;
+        showToast(msg);
+        // Optionally, remove error param from URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+    window.onload = function() {
+      checkAuth();
+      checkLoginError();
+    };
   </script>
 </body>
 </html>
