@@ -191,6 +191,8 @@
         <select id="projectSelect" onchange="onProjectChange()" style="flex:1"></select>
         <input id="project" value="default" style="display:none;" />
         <button onclick="loadEnv()" style="padding: 0.5em 1em;">Load</button>
+        <button onclick="newProject()" title="Create new .env file" style="padding: 0.5em 1em;background:#10b981;">New</button>
+        <button onclick="deleteProject()" title="Delete selected .env file" style="padding: 0.5em 1em;background:#ef4444;">Delete</button>
       </div>
     </label>
     <textarea id="envContent"></textarea>
@@ -228,7 +230,7 @@
       document.getElementById('mainContainer').style.display = 'none';
       document.getElementById('loginOverlay').style.display = '';
     }
-    async function fetchProjects() {
+    async function fetchProjects(selected) {
       const res = await fetch('/api/env');
       const projects = await res.json();
       const select = document.getElementById('projectSelect');
@@ -240,9 +242,12 @@
         select.appendChild(opt);
       });
       if (projects.length) {
-        select.value = projects[0];
-        document.getElementById('project').value = projects[0]; // Set input value
+        select.value = selected && projects.includes(selected) ? selected : projects[0];
+        document.getElementById('project').value = select.value;
         loadEnv();
+      } else {
+        document.getElementById('envContent').value = '';
+        document.getElementById('project').value = '';
       }
     }
     function onProjectChange() {
@@ -300,6 +305,46 @@
         showToast(msg);
         // Optionally, remove error param from URL
         window.history.replaceState({}, document.title, window.location.pathname);
+      }
+    }
+    async function newProject() {
+      const name = prompt('Enter new project name (no spaces, e.g. "my-app"):');
+      if (!name) return;
+      if (!/^[\w.-]+$/.test(name)) {
+        showToast('Invalid name. Use letters, numbers, dash, dot, or underscore.');
+        return;
+      }
+      // Check if already exists
+      const select = document.getElementById('projectSelect');
+      for (let i = 0; i < select.options.length; i++) {
+        if (select.options[i].value === name) {
+          showToast('Project already exists.');
+          return;
+        }
+      }
+      // Create new file
+      const res = await fetch(`/api/env/${encodeURIComponent(name)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content: '' })
+      });
+      if (res.ok) {
+        showToast('Created!', 'success');
+        fetchProjects(name);
+      } else {
+        showToast('Failed to create file');
+      }
+    }
+    async function deleteProject() {
+      const project = document.getElementById('project').value;
+      if (!project) return;
+      if (!confirm(`Delete "${project}"? This cannot be undone.`)) return;
+      const res = await fetch(`/api/env/${encodeURIComponent(project)}`, { method: 'DELETE' });
+      if (res.ok) {
+        showToast('Deleted!', 'success');
+        fetchProjects();
+      } else {
+        showToast('Failed to delete file');
       }
     }
     window.onload = function() {

@@ -89,6 +89,19 @@ app.post('/api/env/:project', async (req, res) => {
   res.sendStatus(200);
 });
 
+// API to delete env file
+app.delete('/api/env/:project', async (req, res) => {
+  const storeDir = path.join(__dirname, '.env_store');
+  const file = path.join(storeDir, `${req.params.project}.env`);
+  if (!fs.existsSync(file)) return res.status(404).send('Not found');
+  try {
+    fs.unlinkSync(file);
+    res.sendStatus(200);
+  } catch (e) {
+    res.status(500).send('Failed to delete');
+  }
+});
+
 // List available env files
 app.get('/api/env', (req, res) => {
   const storeDir = path.join(__dirname, '.env_store');
